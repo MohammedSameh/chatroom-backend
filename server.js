@@ -3,22 +3,20 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 
-// Initialize Express App
 const app = express();
 app.use(cors());
 
-// Create HTTP Server
 const server = http.createServer(app);
 
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: '*', // Adjust this in production to your frontend's origin
+    origin: '*', // TODO: Use frontend's origin
     methods: ['GET', 'POST']
   }
 });
 
-// In-memory storage for rooms and users
+// In-memory storage for rooms and users, TODO: Replace with DynamoDB or Redis
 const rooms = {};
 
 io.on('connection', (socket) => {
@@ -129,7 +127,6 @@ io.on('connection', (socket) => {
 
           clearTimeout(room.timer); // Clear the timer after the voting phase is done
 
-          // Ask the host if they want to play again after announcing the winner
           io.to(room.host).emit('askToPlayAgain', { message: "Do you want to play again?" });
 
           // clearTimeout(room.timer); // Clear any running timer
@@ -662,26 +659,25 @@ function sendNextPrompt(roomCode, promptNumber) {
   const room = rooms[roomCode];
   if (!room) return;
 
-  // Clear any existing timer before starting a new round
+  // Clear any existing timer, prev. responses, prev. votes before starting a new round
   if (room.timer) {
     clearTimeout(room.timer);
   }
 
   const prompt = getRandomPrompt();
-  room.responses = {};  // Clear previous responses
-  room.votes = {};      // Clear previous votes
+  room.responses = {};  
+  room.votes = {};      
 
   io.to(roomCode).emit('newPrompt', { prompt, promptNumber });
 
   // Set a 60-second timer for the round
   room.timer = setTimeout(() => {
     if (Object.keys(room.responses).length > 0) {
-      io.to(roomCode).emit('showResponses', room.responses);
-      // Proceed with showing responses and asking for votes
+      io.to(roomCode).emit('showResponses', room.responses);      
     } else {
       io.to(roomCode).emit('noResponses', { message: "No responses received in time." });
     }
-  }, 60000); // Example of 60 seconds for response time
+  }, 60000); // 60 seconds for response time
 }
 
 function determineWinner(votes) {
